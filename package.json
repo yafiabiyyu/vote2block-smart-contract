@@ -1,0 +1,29 @@
+{
+  "name": "vote2block-smart-contract",
+  "version": "1.0.0",
+  "description": "smart-contract untuk e-voting skripsi",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yafiabiyyu/vote2block-smart-contract.git"
+  },
+  "keywords": [
+    "smart-contract",
+    "e-voting"
+  ],
+  "author": "yafiabiyyu",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yafiabiyyu/vote2block-smart-contract/issues"
+  },
+  "homepage": "https://github.com/yafiabiyyu/vote2block-smart-contract#readme",
+  "dependencies": {
+    "@openzeppelin/contracts": "^3.4.0"
+  }
+}
