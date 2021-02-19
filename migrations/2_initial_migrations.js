@@ -1,5 +1,5 @@
-const Penyelenggara = artifacts.require("Penyelenggara");
+const Vote2Block = artifacts.require("Vote2Block");
 
 module.exports = function (deployer, networks, accounts) {
-  deployer.deploy(Penyelenggara,accounts[0]);
+  deployer.deploy(Vote2Block,accounts[0]);
 };
