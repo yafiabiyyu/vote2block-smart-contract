@@ -1,152 +1,206 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.7.0;
+pragma experimental ABIEncoderV2;
 
-import "./Penyelenggara.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract Vote2Block is Penyelenggara {
-    
-    // event yang ada di contract
-    event TimestampRegisterKandidatPemilihSet(
-        uint256 _eventStart,
-        uint256 _eventFinish,
-        address _sender
+contract Vote2Block is AccessControl {
+    // Event list di contract
+    event TimestampSetting(
+        uint256 _registerStart,
+        uint256 _registerFinis,
+        uint256 _votingStart,
+        uint256 _votingFinis
     );
-    
-    event TimestampVotingSet(
-        uint256 _eventStart,
-        uint256 _eventFinish,
-        address _sender
-    );
-    
-    event NewKandidatRegister (
+
+    event NewKandidatRegister(
         uint256 _kandidatID,
         uint256 _totalVote,
-        bytes32 _kandidatName,
-        address _sender
+        bytes32 _kandidatName
     );
-    
+
     event NewPemilihRegister(
-        address pemilihAddress,
-        uint256 hakPilihStatus,
-        address adminRegister
+        address _pemilihAddress,
+        uint256 _statusHakPiih,
+        bool _statusVoting
     );
-    
-    // type data struct VotingTimestamp
-    // untuk menyimpan seluh data waktu selama proses voting
-    struct VotingTimestamp {
-        // setup unix timestamp for register kandidat dan pemilh
-        uint256  startRegisterKandidatPemilihTimestamp;
-        uint256  finisRegisterKandidatPemilhTimestamp;
-        
-        // setup unix timestamp for voting process;
-        uint256  startVotingProccessTimestamp;
-        uint256  finisVotingProcessTimestamp;
-    }
-    VotingTimestamp private vt;
-    
-    struct Kandidat {
-        uint256 totalVote;
-        bytes32 kandidatName;
-    }
-    
-    struct Pemilih {
-        uint256 statusHakPilih;
-        uint256 pilihanKandidat;
-        bool statusVote;
-    }
-    
-    // mapping ddata
-    mapping(address => Pemilih) private pemilih;
-    mapping(uint256 => Kandidat) private kandidat;
-    
+
+    // Deklarasi role admin petugas dan petugas dengan bytes 32
+    bytes32 public constant DEFAULT_ADMIN_PETUGAS = keccak256("DEFAULT_ADMIN_PETUGAS");
+    bytes32 public constant DEFAULT_PETUGAS_ROLE = keccak256("DEFAULT_PETUGAS_ROLE");
+
     constructor(address _ketuaAddress) {
-        _setupRole(DEFAULT_ADMIN_ROLE,_ketuaAddress);
-        _setRoleAdmin(DEFAULT_ROLE_PETUGAS,DEFAULT_ADMIN_PETUGAS);
+        _setupRole(DEFAULT_ADMIN_ROLE, _ketuaAddress);
+        _setRoleAdmin(DEFAULT_PETUGAS_ROLE, DEFAULT_ADMIN_PETUGAS);
     }
-    
+
+    //Modifier yang ada di dalam contract
     modifier onlyOwner {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender),"Terbatas hanya untuk ketua");
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Terbatas hanya untuk ketua penyelenggara");
         _;
     }
-    
+
     modifier onlyAdminPetugas {
         require(hasRole(DEFAULT_ADMIN_PETUGAS, msg.sender));
         _;
     }
-    
-    modifier onlyPetugas {
-        require(hasRole(DEFAULT_ROLE_PETUGAS, msg.sender));
-        _;
-    }
-    
-    modifier onlyRegisterStart(uint256 _liveTimestamp) {
 
+    modifier onlyPetugas {
+        require(hasRole(DEFAULT_PETUGAS_ROLE, msg.sender),"Terbatas hanya untuk petugas");
+        _;
+    }
+
+    modifier onlyRegisterStart(uint256 _liveTimestamp) {
+        VotingTimestampSetting memory vt;
         require(
-            _liveTimestamp <= vt.startRegisterKandidatPemilihTimestamp
-            && _liveTimestamp >= vt.finisRegisterKandidatPemilhTimestamp,
-            "Waktu pendaftaran belum di mulai atau telah habis masa waktunya");
+            _liveTimestamp <= vt.startRegisterTimestamp && _liveTimestamp >= vt.finisRegisterTimestamp  
+        );
         _;
     }
-    
-    modifier onlyPemilh {
-        require(pemilih[msg.sender].statusHakPilih == 1);
+
+    modifier onlyVotingStart(uint256 _liveTimestamp) {
+        VotingTimestampSetting memory vt;
+        require(
+            _liveTimestamp <= vt.startVotingEvent && _liveTimestamp >= vt.finisVotingEvent
+        );
         _;
     }
-    
-    // start set admin petugas dan petugas
-    function AddAdminPetugas(address _AdminPetugasAddress) public onlyOwner {
-        setAdminPetugasAddress(_AdminPetugasAddress);
+
+    // list struct data 
+    struct VotingTimestampSetting {
+        uint256 startRegisterTimestamp;
+        uint256 finisRegisterTimestamp;
+
+        uint256 startVotingEvent;
+        uint256 finisVotingEvent;
+    }
+
+    struct Kandidat {
+        uint256 kandidatID;
+        uint256 totalVote;
+        bytes32 kandidatName;
+    }
+
+    struct Pemilih {
+        uint256 statusHakPilih;
+        uint256 kandidatPilihan;
+        bool statusVoting;
     }
     
-    function RemoveAdminPetugas(address _AdminPetugasAddress) public onlyOwner {
-        removeAdminPetugasAddress(_AdminPetugasAddress);
+    //menyimpan Pemilih struct untuk setiap address
+    mapping(address => Pemilih) public pemilih;
+
+    //dynamic array dari kandidat struct
+    Kandidat[] public kandidat;
+
+    //seluruh function penyelenggara
+    function addAdminPetugas(address _adminPetugasAddress) public onlyOwner {
+        grantRole(DEFAULT_ADMIN_PETUGAS, _adminPetugasAddress);
+        emit RoleGranted(DEFAULT_PETUGAS_ROLE, _adminPetugasAddress, msg.sender);
+    }
+
+    function removeAdminPetugas(address _adminPetugasAddress) public onlyOwner {
+        revokeRole(DEFAULT_ADMIN_PETUGAS, _adminPetugasAddress);
+        emit RoleRevoked(DEFAULT_ADMIN_PETUGAS, _adminPetugasAddress, msg.sender);
+    }
+
+    function addPetugas(address _petugasAddress) public onlyAdminPetugas {
+        grantRole(DEFAULT_PETUGAS_ROLE, _petugasAddress);
+        emit RoleGranted(DEFAULT_PETUGAS_ROLE, _petugasAddress,msg.sender);
+    }
+
+    function removePetugas(address _petugasAddress) public onlyAdminPetugas {
+        revokeRole(DEFAULT_PETUGAS_ROLE, _petugasAddress);
+        emit RoleRevoked(DEFAULT_PETUGAS_ROLE, _petugasAddress,msg.sender);
     }
     
-    function AddPetugas(address _PetugasAddress) public onlyAdminPetugas {
-        addNewPetugas(_PetugasAddress);
-    }
-    
-    function RemovePetugas(address _PetugasAddress) public onlyAdminPetugas {
-        removePetugas(_PetugasAddress);
-    }
-    // finish set admin petugas dan petugas
-    
-    // start set waktu dalam proses pemilihan
-    function setTimestamPendaftaranterKandidatPemilih(
-        uint256 _timestampPendaftaranMulai,
-        uint256 _timestampPendaftaranSelesai
+    //voting function
+    function setVotingTimestampEvent(
+        uint256 _startRegisterTimeStamp,
+        uint256 _finisRegisterTimeStamp,
+        uint256 _startVotingEvent,
+        uint256 _finisVotingEvent
     ) public onlyOwner {
-        vt.startRegisterKandidatPemilihTimestamp = _timestampPendaftaranMulai;
-        vt.finisRegisterKandidatPemilhTimestamp = _timestampPendaftaranSelesai;
-        emit TimestampRegisterKandidatPemilihSet(_timestampPendaftaranMulai, _timestampPendaftaranSelesai, msg.sender);
+        //pass
+        VotingTimestampSetting(
+            _startRegisterTimeStamp,
+            _finisRegisterTimeStamp,
+            _startVotingEvent,
+            _finisVotingEvent
+        );
+        emit TimestampSetting(
+            _startRegisterTimeStamp,
+            _finisRegisterTimeStamp,
+            _startVotingEvent,
+            _finisVotingEvent
+        );
     }
-    
-    function setTimestampProsesVoting(
-        uint256 _timestampVotingMulai,
-        uint256 _timestampVotingSelesai
-    ) public onlyOwner {
-        vt.startVotingProccessTimestamp = _timestampVotingMulai;
-        vt.finisVotingProcessTimestamp = _timestampVotingSelesai;
-        emit TimestampVotingSet(_timestampVotingMulai, _timestampVotingSelesai, msg.sender);
-    }
-    // finish set waktu dalam proses pemilihan
-    
-    // start register kandidat dan pemilihan
+
     function RegisterKandidat(
         uint256 _kandidatID,
-        bytes32 _kandidatName,
-        uint256 _liveTimestamp
+        uint256 _liveTimestamp,
+        bytes32 _kandidatName
     ) public onlyPetugas onlyRegisterStart(_liveTimestamp) {
-        kandidat[_kandidatID] = Kandidat(0, _kandidatName);
-        emit NewKandidatRegister(_kandidatID, 0, _kandidatName, msg.sender);
+        kandidat.push(Kandidat({
+            kandidatID:_kandidatID,
+            totalVote:0,
+            kandidatName:_kandidatName
+        }));
+        emit NewKandidatRegister(
+            _kandidatID,
+            0,
+            _kandidatName
+        );
     }
-    
-    function RegisterPemilih(address _pemilihAddress,uint256 _liveTimestamp) public onlyPetugas onlyRegisterStart(_liveTimestamp) {
-        require(!pemilih[_pemilihAddress].statusVote,"Pemilh telah memberikan hak suara");
-        require(pemilih[_pemilihAddress].statusHakPilih == 0);
-        // memberikan hak memilih kapada pemilih
+
+    function RegisterPemilih(
+        address _pemilihAddress,
+        uint256 _liveTimestamp
+    ) public onlyPetugas onlyVotingStart(_liveTimestamp) {
+        require(!pemilih[_pemilihAddress].statusVoting, "Pemilih sudah memberikan hak suara");
+        require(pemilih[_pemilihAddress].statusHakPilih == 1, "Pemilih tidak memiliki hak pilih");
+        // memberikan hak pilih kepada pemilh 
         pemilih[_pemilihAddress].statusHakPilih = 1;
-        emit NewPemilihRegister(_pemilihAddress, 1, msg.sender);
+        pemilih[_pemilihAddress].statusVoting = false;
+        emit NewPemilihRegister(
+            _pemilihAddress,
+            1,
+            false
+        );
     }
-    // finish register kandidat dna pemilih
+
+    function Voting(
+        uint256 _kandidatID,
+        uint256 _liveTimestamp
+    ) public onlyVotingStart(_liveTimestamp) {
+        Pemilih storage pm = pemilih[msg.sender];
+        require(
+            pm.statusHakPilih != 0,
+            "Pemilih tidak memiliki hak pilih"
+        );
+
+        require(
+            !pm.statusVoting,
+            "Pemilih sudah menggunakan hak pilihnya"
+        );
+        pm.statusVoting = true;
+        pm.kandidatPilihan = _kandidatID;
+        kandidat[_kandidatID].totalVote += pm.statusHakPilih;
+    }
+
+    function getKandidat() public view returns(Kandidat[] memory) {
+        return kandidat;
+    }
+
+    function _perhitunganSuara() private view returns(uint256 totalSuara_) {
+        uint totalSuaraKandidat = 0;
+        for (uint p = 0; p < kandidat.length; p++) {
+            totalSuaraKandidat = kandidat[p].totalVote;
+            totalSuara_ = p;
+        }
+    }
+
+    function kandidatTerpilih() public view returns(bytes32 kandidatName_) {
+        kandidatName_ = kandidat[_perhitunganSuara()].kandidatName; 
+    }
 }
