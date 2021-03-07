@@ -85,7 +85,7 @@ module.exports = {
     solc: {
       version: "0.7.0",    // Fetch exact version from solc-bin
        optimizer: {
-         enable: true,
+         enabled: true,
          runs: 200
        },
       //  evmVersion: "byzantium"

@@ -1,8 +1,8 @@
 const { expect } = require('chain');
-const { constants, expectEvent, expectRevert, BN } = require(
+const { constants, expectEvent, expectRevert} = require(
   '@openzeppelin/test-helpers'
 );
-const { keccak256 } = require('web3-utils');
+const { keccak256, BN } = require('web3-utils');
 
 //load contract file
 const Vote2Block = artifacts.require('Vote2Block');
@@ -143,6 +143,23 @@ contract('Vote2Block', accounts => {
       );
       await this.vote2block.addAdminPetugas(adminPetugas,{from:ketuaPenyelenggara});
       await this.vote2block.addPetugas(petugas1,{from:adminPetugas});
+      const liveTimestamp = await new Date('2021','03','02','09','10','00');
+      const livetimestamp = liveTimestamp.getTime()/1000;
+      var pemilihStatus = new BN(1);
+      const txHash = await this.vote2block.RegisterPemilih(
+        pemilih1,
+        livetimestamp,
+        {from:petugas1}
+      );
+      expectEvent(
+        txHash,
+        'NewPemilihRegister',
+        {
+          _pemilihAddress: pemilih1,
+          _statusHakPilih: pemilihStatus,
+          _statusVoting:false
+        }
+      );
     });
   });
 });
