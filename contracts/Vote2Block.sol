@@ -53,7 +53,7 @@ contract Vote2Block is AccessControl {
     modifier onlyRegisterStart(uint256 _liveTimestamp) {
         VotingTimestampSetting memory vt;
         require(
-            _liveTimestamp >= vt.startRegisterTimestamp && _liveTimestamp <= vt.finisRegisterTimestamp,
+            _liveTimestamp > vt.startRegisterTimestamp && _liveTimestamp > vt.finisRegisterTimestamp,
             "Waktu pendaftaran telah selesai atau belum di mulai"
         );
         _;
@@ -62,7 +62,7 @@ contract Vote2Block is AccessControl {
     modifier onlyVotingStart(uint256 _liveTimestamp) {
         VotingTimestampSetting memory vt;
         require(
-            _liveTimestamp <= vt.startVotingEvent && _liveTimestamp >= vt.finisVotingEvent
+            _liveTimestamp > vt.startVotingEvent && _liveTimestamp > vt.finisVotingEvent
         );
         _;
     }
@@ -157,7 +157,7 @@ contract Vote2Block is AccessControl {
     function RegisterPemilih(
         address _pemilihAddress,
         uint256 _liveTimestamp
-    ) public onlyPetugas {
+    ) public onlyPetugas onlyRegisterStart(_liveTimestamp) {
         require(!pemilih[_pemilihAddress].statusVoting, "Pemilih sudah memberikan hak suara");
         require(pemilih[_pemilihAddress].statusHakPilih == 0, "Pemilih tidak memiliki hak pilih");
         // memberikan hak pilih kepada pemilh 
