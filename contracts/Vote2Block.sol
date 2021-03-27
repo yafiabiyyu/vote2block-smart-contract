@@ -1,79 +1,56 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier:MIT
 pragma solidity 0.7.0;
-pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+contract Vote2Block {
 
-contract Vote2Block is AccessControl {
-    // Event list di contract
-    event TimestampSetting(
+    // deklarasi akses pengguna di dalam smart-contract
+    address ketuaPenyelenggara;
+    mapping(address => bool) public AdminPetugas;
+    mapping(address => bool) public Petugas;
+    
+
+    // deklarasi event di dalam smart-contract
+    event RegisterAdminPetugas(address _adminAddress, address sender);
+    event RemoveAdminPetugas(address _adminAddress, address sender);
+    event VotingTimeSet(
         uint256 _registerStart,
         uint256 _registerFinis,
         uint256 _votingStart,
         uint256 _votingFinis
     );
-
-    event NewKandidatRegister(
-        uint256 _kandidatID,
-        uint256 _totalVote,
-        bytes32 _kandidatName
+    event RegisterPetugas(address _petugasAddress, address sender);
+    event RemovePetugas(address _petugasAddress, address sender);
+    event RegisterKandidat(
+        uint256 _kandidatID, 
+        uint256 _totalVote, 
+        bytes32 _kandidatName, 
+        address sender
     );
+    event RegisterPemilih(address _pemilihAddress, uint256 _statusHakpilih, bool statusVoting);
 
-    event NewPemilihRegister(
-        address _pemilihAddress,
-        uint256 _statusHakPilih,
-        bool _statusVoting
-    );
-
-    // Deklarasi role admin petugas dan petugas dengan bytes 32
-    bytes32 public constant DEFAULT_ADMIN_PETUGAS = keccak256("DEFAULT_ADMIN_PETUGAS");
-    bytes32 public constant DEFAULT_PETUGAS_ROLE = keccak256("DEFAULT_PETUGAS_ROLE");
-
-    constructor(address _ketuaAddress) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _ketuaAddress);
-        _setRoleAdmin(DEFAULT_PETUGAS_ROLE, DEFAULT_ADMIN_PETUGAS);
-    }
-
-    //Modifier yang ada di dalam contract
-    modifier onlyOwner {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Terbatas hanya untuk ketua penyelenggara");
-        _;
-    }
-
-    modifier onlyAdminPetugas {
-        require(hasRole(DEFAULT_ADMIN_PETUGAS, msg.sender));
-        _;
-    }
-
-    modifier onlyPetugas {
-        require(hasRole(DEFAULT_PETUGAS_ROLE, msg.sender),"Terbatas hanya untuk petugas");
-        _;
-    }
-
+    // modifier list
     modifier onlyRegisterStart(uint256 _liveTimestamp) {
-        VotingTimestampSetting memory vt;
+        VotingTimeStamp memory vt;
         require(
-            _liveTimestamp > vt.startRegisterTimestamp && _liveTimestamp > vt.finisRegisterTimestamp,
-            "Waktu pendaftaran telah selesai atau belum di mulai"
+            _liveTimestamp > vt.startRegisterTime && _liveTimestamp > vt.finishRegisterTime,
+            "Waktu register belum di mulai atau sudah berkahir"
         );
         _;
     }
-
+    
     modifier onlyVotingStart(uint256 _liveTimestamp) {
-        VotingTimestampSetting memory vt;
-        require(
-            _liveTimestamp > vt.startVotingEvent && _liveTimestamp > vt.finisVotingEvent
-        );
-        _;
+      VotingTimeStamp memory vt;
+      require(
+        _liveTimestamp > vt.startVotingTime && _liveTimestamp > vt.finishVotingTime
+      );
+      _;
     }
-
-    // list struct data 
-    struct VotingTimestampSetting {
-        uint256 startRegisterTimestamp;
-        uint256 finisRegisterTimestamp;
-
-        uint256 startVotingEvent;
-        uint256 finisVotingEvent;
+    // struct data list
+    struct VotingTimeStamp {
+        uint256 startRegisterTime;
+        uint256 finishRegisterTime;
+        uint256 startVotingTime;
+        uint256 finishVotingTime;
     }
 
     struct Kandidat {
@@ -87,49 +64,54 @@ contract Vote2Block is AccessControl {
         uint256 kandidatPilihan;
         bool statusVoting;
     }
-    
-    //menyimpan Pemilih struct untuk setiap address
+
+
+    constructor(address _ketuaPenyelenggara) {
+        ketuaPenyelenggara = _ketuaPenyelenggara;
+    }
+    Kandidat[] public kandidat;
     mapping(address => Pemilih) public pemilih;
 
-    //dynamic array dari kandidat struct
-    Kandidat[] public kandidat;
-
-    //seluruh function penyelenggara
-    function addAdminPetugas(address _adminPetugasAddress) public onlyOwner {
-        grantRole(DEFAULT_ADMIN_PETUGAS, _adminPetugasAddress);
-        emit RoleGranted(DEFAULT_PETUGAS_ROLE, _adminPetugasAddress, msg.sender);
+    // Ketua
+    function addAdminPetugas(address _adminAddress, uint256 nonce, bytes memory signature) public {
+        bytes32 message = prefixed(keccak256(abi.encodePacked(_adminAddress, nonce)));
+        address recoverAddress = recoverSigner(message, signature);
+        require(recoverAddress == ketuaPenyelenggara,"Hanya ketua penyelenggara yang dapat menambahkan admin");
+        AdminPetugas[_adminAddress] = true;
+        emit RegisterAdminPetugas(_adminAddress, recoverAddress);
     }
 
-    function removeAdminPetugas(address _adminPetugasAddress) public onlyOwner {
-        revokeRole(DEFAULT_ADMIN_PETUGAS, _adminPetugasAddress);
-        emit RoleRevoked(DEFAULT_ADMIN_PETUGAS, _adminPetugasAddress, msg.sender);
+    function removeAdminPetugas(address _adminAddress, uint256 nonce, bytes memory signature) public {
+        bytes32 message = prefixed(keccak256(abi.encodePacked(_adminAddress, nonce)));
+        address recoverAddress = recoverSigner(message, signature);
+        require(recoverAddress == ketuaPenyelenggara,"Hanya ketua penyelenggara yang dapat menghapus admin");
+        AdminPetugas[_adminAddress] = false;
+        emit RemoveAdminPetugas(_adminAddress, recoverAddress);
     }
 
-    function addPetugas(address _petugasAddress) public onlyAdminPetugas {
-        grantRole(DEFAULT_PETUGAS_ROLE, _petugasAddress);
-        emit RoleGranted(DEFAULT_PETUGAS_ROLE, _petugasAddress,msg.sender);
-    }
-
-    function removePetugas(address _petugasAddress) public onlyAdminPetugas {
-        revokeRole(DEFAULT_PETUGAS_ROLE, _petugasAddress);
-        emit RoleRevoked(DEFAULT_PETUGAS_ROLE, _petugasAddress,msg.sender);
-    }
-    
-    //voting function
     function setVotingTimestampEvent(
         uint256 _startRegisterTimeStamp,
         uint256 _finisRegisterTimeStamp,
         uint256 _startVotingEvent,
-        uint256 _finisVotingEvent
-    ) public onlyOwner {
+        uint256 _finisVotingEvent,
+        bytes memory signature
+    ) public {
         //pass
-        VotingTimestampSetting(
+        bytes32 message = prefixed(keccak256(abi.encodePacked(
+            _startRegisterTimeStamp,
+            _finisRegisterTimeStamp,
+            _startVotingEvent,
+            _finisVotingEvent
+        )));
+        address recoverAddress = recoverSigner(message, signature);
+        require(recoverAddress == ketuaPenyelenggara);
+        VotingTimeStamp(
             _startRegisterTimeStamp,
             _finisRegisterTimeStamp,
             _startVotingEvent,
             _finisVotingEvent
         );
-        emit TimestampSetting(
+        emit VotingTimeSet(
             _startRegisterTimeStamp,
             _finisRegisterTimeStamp,
             _startVotingEvent,
@@ -137,71 +119,146 @@ contract Vote2Block is AccessControl {
         );
     }
 
-    function RegisterKandidat(
-        uint256 _kandidatID,
+    // Admin Petugas
+    function addPetugas(address _petugasAddress, uint256 nonce, bytes memory signature) public {
+        bytes32 message = prefixed(keccak256(abi.encodePacked(_petugasAddress, nonce)));
+        address recoverAddress = recoverSigner(message, signature);
+        require(AdminPetugas[recoverAddress]);
+        Petugas[_petugasAddress] = true;
+        emit RegisterPetugas(_petugasAddress, recoverAddress);
+    }
+
+    function removePetugas(address _petugasAddress, uint256 nonce, bytes memory signature) public {
+        bytes32 message = prefixed(keccak256(abi.encodePacked(_petugasAddress, nonce)));
+        address recoverAddress = recoverSigner(message, signature);
+        require(AdminPetugas[recoverAddress]);
+        Petugas[_petugasAddress] = false;
+        emit RemovePetugas(_petugasAddress, recoverAddress);
+    }
+
+    // petugas
+    function registerKandidat(
+        uint256 _kandidatId,
+        uint256 nonce,
         uint256 _liveTimestamp,
-        bytes32 _kandidatName
-    ) public onlyPetugas onlyRegisterStart(_liveTimestamp) {
+        bytes32 _kandidatName,
+        bytes memory signature
+    ) public onlyRegisterStart(_liveTimestamp){
+        bytes32 message = prefixed(keccak256(abi.encodePacked(
+            _kandidatId,
+            _kandidatName,
+            nonce
+        )));
+        address recoverAddress = recoverSigner(message, signature);
+        require(Petugas[recoverAddress]);
         kandidat.push(Kandidat({
-            kandidatID:_kandidatID,
+            kandidatID:_kandidatId,
             totalVote:0,
             kandidatName:_kandidatName
         }));
-        emit NewKandidatRegister(
-            _kandidatID,
+        emit RegisterKandidat(
+            _kandidatId,
             0,
-            _kandidatName
+            _kandidatName,
+            recoverAddress
         );
     }
 
-    function RegisterPemilih(
+    function registerPemilih(
         address _pemilihAddress,
-        uint256 _liveTimestamp
-    ) public onlyPetugas onlyRegisterStart(_liveTimestamp) {
-        require(!pemilih[_pemilihAddress].statusVoting, "Pemilih sudah memberikan hak suara");
-        require(pemilih[_pemilihAddress].statusHakPilih == 0, "Pemilih tidak memiliki hak pilih");
-        // memberikan hak pilih kepada pemilh 
-        pemilih[_pemilihAddress].statusHakPilih = 1;
-        pemilih[_pemilihAddress].statusVoting = false;
-        emit NewPemilihRegister(
-            _pemilihAddress,
-            1,
-            false
-        );
-    }
+        uint256 nonce,
+        uint256 _liveTimestamp,
+        bytes memory signature
+    ) public onlyRegisterStart(_liveTimestamp){
+            bytes32 message = prefixed(
+              keccak256(abi.encodePacked(_pemilihAddress, nonce))
+            );
+            address recoverAddress = recoverSigner(message, signature);
+            require(Petugas[recoverAddress]);
+            require(
+              !pemilih[_pemilihAddress].statusVoting,
+              "Pemilih sudah memberikan hak pilihnya"
+            );
+            require(
+              pemilih[_pemilihAddress].statusHakPilih == 0,
+              "Pemilih belum memiliki hak pilih"
+            );
+            pemilih[_pemilihAddress].statusHakPilih = 1;
+            pemilih[_pemilihAddress].statusVoting = false;
+            emit RegisterPemilih(
+              _pemilihAddress,
+              1,
+              false
+            );
+        }
 
     function Voting(
-        uint256 _kandidatID,
-        uint256 _liveTimestamp
+      uint256 _kandidatID,
+      uint256 nonce,
+      uint256 _liveTimestamp,
+      bytes memory signature
     ) public onlyVotingStart(_liveTimestamp) {
-        Pemilih storage pm = pemilih[msg.sender];
-        require(
-            pm.statusHakPilih != 0,
-            "Pemilih tidak memiliki hak pilih"
-        );
-
-        require(
-            !pm.statusVoting,
-            "Pemilih sudah menggunakan hak pilihnya"
-        );
-        pm.statusVoting = true;
-        pm.kandidatPilihan = _kandidatID;
-        kandidat[_kandidatID].totalVote += pm.statusHakPilih;
+      bytes32 message = prefixed(
+        keccak256(abi.encodePacked(_kandidatID,nonce))
+      );
+      address recoverAddress = recoverSigner(message, signature);
+      Pemilih storage pm = pemilih[recoverAddress];
+      require(
+        pm.statusHakPilih != 0,
+        "Pemilih tidak memiliki hak pilih"
+      );
+      require(
+        !pm.statusVoting,
+        "Pemilih sudah menggunakan hak pilihnya"
+      );
+      pm.statusVoting = true;
+      pm.kandidatPilihan = _kandidatID;
+      uint indexKandidat = _kandidatID - 1;
+      kandidat[indexKandidat].totalVote += pm.statusHakPilih;
     }
 
-    function getKandidat() public view returns(Kandidat[] memory) {
-        return kandidat;
+    function _hitungTotalSuara() internal view returns(uint256 totalSuara_) {
+      uint totalSuaraKandidat = 0;
+      for (uint p = 0; p < kandidat.length; p++) {
+        totalSuaraKandidat = kandidat[p].totalVote;
+        totalSuara_ = p;
+      }
     }
-
-    function _perhitunganSuara() private view returns(uint256 totalSuara_) {
-        uint totalSuaraKandidat = 0;
-        for (uint p = 0; p < kandidat.length; p++) {
-            totalSuaraKandidat = kandidat[p].totalVote;
-            totalSuara_ = p;
-        }
-    }
-
+  
     function kandidatTerpilih() public view returns(bytes32 kandidatName_) {
-        kandidatName_ = kandidat[_perhitunganSuara()].kandidatName; 
+      kandidatName_ = kandidat[_hitungTotalSuara()].kandidatName;
+    }
+
+    function getTotalKandidat() public view returns(uint256) {
+      return kandidat.length;
+    }
+
+    function getKandidatData(uint256 kandidatIndex) public view returns(uint256, uint256, bytes32) {
+      return(kandidat[kandidatIndex].kandidatID,kandidat[kandidatIndex].totalVote,kandidat[kandidatIndex].kandidatName);
+    }
+    // Handle signature data dari user
+    function splitSignature(bytes memory signature) internal pure returns(
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) {
+        require(signature.length == 65);
+        assembly {
+            r := mload(add(signature, 32))
+            s := mload(add(signature, 64))
+            v := byte(0, mload(add(signature, 96)))
+        }
+        return (v, r, s);
+    }
+
+    function recoverSigner(bytes32 message, bytes memory signature) internal pure returns(address) {
+        (uint8 v, bytes32 r, bytes32 s) = splitSignature(signature);
+        return ecrecover(message, v, r, s);
+    }
+
+    function prefixed(bytes32 hash) internal pure returns(bytes32) {
+        return keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)
+        );
     }
 }
