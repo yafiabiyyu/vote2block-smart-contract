@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/yafiabiyyu/vote2block-smart-contract#readme",
   "dependencies": {
-    "@openzeppelin/contracts": "^3.4.0"
+    "@openzeppelin/contracts": "^3.4.0",
+    "eth-gas-reporter": "^0.2.22"
   }
 }
