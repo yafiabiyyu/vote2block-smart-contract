@@ -22,6 +22,8 @@ contract Vote2Block {
         uint256 finisVoting
     );
 
+    event Voted(address voter, uint256 kandidatID, bool statusVoting);
+
     // modifier list
     modifier onlyRegisterStart(uint256 _liveTimestamp) {
         VotingTimeStamp memory vt;
@@ -70,7 +72,7 @@ contract Vote2Block {
     function addPetugas(address _petugasAddress, uint256 nonce, bytes memory signature) public {
         bytes32 message = prefixed(keccak256(abi.encodePacked(_petugasAddress, nonce)));
         address recoverAddress = recoverSigner(message, signature);
-        require(recoverAddress == ketuaPenyelenggara);
+        require(recoverAddress == ketuaPenyelenggara,"Hanya ketua Pelaksana");
         Petugas[_petugasAddress] = true;
         emit RegisterPetugas(_petugasAddress, recoverAddress);
     }
@@ -78,7 +80,7 @@ contract Vote2Block {
     function removePetugas(address _petugasAddress, uint256 nonce, bytes memory signature) public {
         bytes32 message = prefixed(keccak256(abi.encodePacked(_petugasAddress, nonce)));
         address recoverAddress = recoverSigner(message, signature);
-        require(recoverAddress == ketuaPenyelenggara);
+        require(recoverAddress == ketuaPenyelenggara,"Hanya ketua Pelaksana");
         Petugas[_petugasAddress] = false;
         emit RemovePetugas(_petugasAddress, recoverAddress);
     }
@@ -98,7 +100,7 @@ contract Vote2Block {
             _finisVotingEvent
         )));
         address recoverAddress = recoverSigner(message, signature);
-        require(recoverAddress == ketuaPenyelenggara);
+        require(recoverAddress == ketuaPenyelenggara,"Hanya ketua Pelaksana");
         VotingTimeStamp(
             _startRegisterTimeStamp,
             _finisRegisterTimeStamp,
@@ -158,7 +160,7 @@ contract Vote2Block {
             );
             require(
                 pemilih[_pemilihAddress].statusHakPilih == 0,
-                "Pemilih belum memiliki hak pilih"
+                "Pemilih sudah memiliki hak pilih"
             );
             pemilih[_pemilihAddress].statusHakPilih = 1;
             pemilih[_pemilihAddress].statusVoting = false;
@@ -192,13 +194,16 @@ contract Vote2Block {
         pm.kandidatPilihan = _kandidatID;
         uint indexKandidat = _kandidatID - 1;
         kandidat[indexKandidat].totalVote += pm.statusHakPilih;
+        emit Voted(recoverAddress,_kandidatID, true);
     }
 
     function _hitungTotalSuara() internal view returns(uint256 totalSuara_) {
         uint totalSuaraKandidat = 0;
         for (uint p = 0; p < kandidat.length; p++) {
-            totalSuaraKandidat = kandidat[p].totalVote;
-            totalSuara_ = p;
+            if(kandidat[p].totalVote > totalSuaraKandidat){
+                totalSuaraKandidat = kandidat[p].totalVote;
+                totalSuara_ = p;
+            }
         }
     }
 
