@@ -44,9 +44,9 @@ module.exports = {
     //
     development: {
      host: "127.0.0.1",     // Localhost (default: none)
-     port: 7545,            // Standard Ethereum port (default: none)
-     network_id: "5777",       // Any network (default: none)
-    },
+     port: 8545,            // Standard Ethereum port (default: none)
+     network_id: "*",       // Any network (default: none)
+    }
     // Another network with more advanced options...
     // advanced: {
     // port: 8777,             // Custom port
@@ -77,17 +77,17 @@ module.exports = {
   // Set default mocha options here, use special reporters etc.
   mocha: {
     reporter: 'eth-gas-reporter',
-    reporterOptions : { currency:'IDR', gasPrice:21 } // See options below
+    reporterOptions : { currency:'IDR', gasPrice:26 } // See options below
   },
 
   // Configure your compilers
   compilers: {
     solc: {
       version: "0.7.0",    // Fetch exact version from solc-bin
-       optimizer: {
-         enabled: true,
-         runs: 200
-       },
+        optimizer: {
+        enabled: true,
+        runs: 200
+      },
       //  evmVersion: "byzantium"
       // }
     }

@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "truffle compile && mocha --exit --recursive"
   },
   "repository": {
     "type": "git",
@@ -25,6 +25,14 @@
   "homepage": "https://github.com/yafiabiyyu/vote2block-smart-contract#readme",
   "dependencies": {
     "@openzeppelin/contracts": "^3.4.0",
-    "eth-gas-reporter": "^0.2.22"
+    "@openzeppelin/test-helpers": "^0.5.11",
+    "dotenv": "^10.0.0",
+    "eth-gas-reporter": "^0.2.22",
+    "web3": "^1.3.6"
+  },
+  "devDependencies": {
+    "@openzeppelin/test-environment": "^0.1.9",
+    "chai": "^4.3.4",
+    "mocha": "^7.2.0"
   }
 }

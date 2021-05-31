@@ -3,3 +3,4 @@ build/
 .env
 scripts/
 .solcx*
+.vscode/
