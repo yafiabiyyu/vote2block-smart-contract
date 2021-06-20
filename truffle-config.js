@@ -17,12 +17,12 @@
  * phrase from a file you've .gitignored so it doesn't accidentally become public.
  *
  */
-
-// const HDWalletProvider = require('@truffle/hdwallet-provider');
-// const infuraKey = "fj4jll3k.....";
+require('dotenv').config();
+const HDWalletProvider = require('truffle-hdwallet-provider');
+const infura_url = process.env.infura_url;
 //
 // const fs = require('fs');
-// const mnemonic = fs.readFileSync(".secret").toString().trim();
+const mnemonic = process.env.mnemonic;
 
 module.exports = {
   /**
@@ -46,6 +46,15 @@ module.exports = {
      host: "127.0.0.1",     // Localhost (default: none)
      port: 8545,            // Standard Ethereum port (default: none)
      network_id: "*",       // Any network (default: none)
+    },
+    ropsten:{
+      provider:function(){
+        return new HDWalletProvider(mnemonic,infura_url)
+      },
+      network_id:3,
+      gas:6721975,
+      gasPrice:20000000000,
+      skipDryRun:true
     }
     // Another network with more advanced options...
     // advanced: {
@@ -75,10 +84,10 @@ module.exports = {
   },
 
   // Set default mocha options here, use special reporters etc.
-  mocha: {
-    reporter: 'eth-gas-reporter',
-    reporterOptions : { currency:'IDR', gasPrice:26 } // See options below
-  },
+  // mocha: {
+  //   reporter: 'eth-gas-reporter',
+  //   reporterOptions : { currency:'IDR', gasPrice:26 } // See options below
+  // },
 
   // Configure your compilers
   compilers: {

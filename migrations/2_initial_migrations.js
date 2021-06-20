@@ -1,5 +1,5 @@
 const Vote2Block = artifacts.require("Vote2Block");
 
 module.exports = function (deployer, networks, accounts) {
-  deployer.deploy(Vote2Block,"0x43A1E7D5A9dB6AbF045F7Ff5C87A9A4b39591368");
+  deployer.deploy(Vote2Block,"0x98F1131099518B6F2197115e7A3EF46b4DC57F9f");
 };
