@@ -96,7 +96,7 @@ contract Vote2Block {
                 )
             );
         address _ownerAddress = recoverSigner(message, signature);
-        require(_ownerAddress == adminAddress);
+        require(_ownerAddress == adminAddress,"Non Admin Address");
         votingtimedata = VotingTimeData(
             _registerstart,
             _registerfinis,
@@ -124,7 +124,7 @@ contract Vote2Block {
                 keccak256(abi.encodePacked(_kandidatID, _kandidatName, nonce))
             );
         address _ownerAddress = recoverSigner(message, signature);
-        require(_ownerAddress == adminAddress);
+        require(_ownerAddress == adminAddress,"Non Admin Address");
         kandidat.push(
             KandidatData({
                 kandidatID: _kandidatID,
@@ -144,11 +144,7 @@ contract Vote2Block {
         bytes32 message =
             prefixed(keccak256(abi.encodePacked(_pemilihAddress, nonce)));
         address _ownerAddress = recoverSigner(message, signature);
-        require(_ownerAddress == adminAddress);
-        require(
-            !pemilihData[_pemilihAddress].votingStatus,
-            "Pemilih telah memberikan suara"
-        );
+        require(_ownerAddress == adminAddress,"Non Admin Address");
         require(
             pemilihData[_pemilihAddress].hakPilih == 0,
             "Pemilih telah memiliki hak pilih"

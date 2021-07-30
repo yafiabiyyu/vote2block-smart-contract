@@ -1,334 +1,385 @@
-const { web3, accounts } = require('@openzeppelin/test-environment');
-const { expectEvent, expectRevert, BN } = require('@openzeppelin/test-helpers');
-const { expect, assert } = require('chai');
+const { web3, accounts } = require("@openzeppelin/test-environment");
+const { expectEvent, expectRevert, BN } = require("@openzeppelin/test-helpers");
+const { expect, assert } = require("chai");
+const { beforeEach } = require("mocha");
 // const { before, beforeEach } = require('mocha');
-const vote = artifacts.require('Vote2Block');
-require('dotenv').config();
+const vote = artifacts.require("Vote2Block");
+require("dotenv").config();
 
-contract("Vote2Block", accounts => {
-    const ketua = process.env.ketua;
-    const petugas = process.env.petugas;
-    const petugas2 = process.env.petugas2;
-    const pemilih1 = process.env.pemilih1;
-    const pemilih2 = process.env.pemilih2;
-    const pemilih3 = process.env.pemilih3;
-    const pemilih4 = process.env.pemilih4;
-    const nonuser = process.env.nonuser;
+contract("Vote2Block", (accounts) => {
+    const registerstart = 1627549200;
+    const registerfinis = 1627552800;
+    const votingstart = 1627556400;
+    const votingfinis = 1627560000;
 
-    const startRegister = new Date(
-        Date.UTC('2021','02','27','10','00','00')
-    );
-    const finisRegister = new Date(
-        Date.UTC('2021','02','27','10','30','00')
-    );
-    const startVoting = new Date(
-        Date.UTC('2021','02','27','11','00','00')
-    );
-    const finisVoting = new Date(
-        Date.UTC('2021','02','27','11','30','00')
-    );
-    const liveTimeRegister = new Date(
-        Date.UTC('2021','02','27','10','20','00')
-    )
-    const liveTimeVoting = new Date(
-        Date.UTC('2021','02','27','11','20','00')
-    )
-    
-    //Convert to unix timestamp
-    const startregister = startRegister.getTime()/1000;
-    const finisregister = finisRegister.getTime()/1000;
-    const startvoting = startVoting.getTime()/1000;
-    const finisvoting = finisVoting.getTime()/1000;
-    const livetimeregister = liveTimeRegister.getTime()/1000;
-    const livetimevoting = liveTimeVoting.getTime()/1000;
-
-    describe("Contract Deployment", function(){
-        beforeEach(async function(){
-            instance = await vote.deployed();
+    describe("Contract Deployment", function () {
+        it("Contract Address", async function () {
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            assert(this.instance.address !== "");
         });
-        it("Contract Address", async () => {
-            assert(instance.address !== '');
-        })
     });
-    describe("Ketua Pelaksana", function(){
-        beforeEach(async function(){
-            instance = await vote.deployed();
-            ketua_address = web3.eth.accounts.privateKeyToAccount(ketua).address
-            ketua_nonce = await web3.eth.getTransactionCount(ketua_address);
-            petugas_address = web3.eth.accounts.privateKeyToAccount(petugas).address
+
+    describe("Pengaturan Waktu", function () {
+        it("Non Admin Menambahkan Data Waktu", async function () {
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            const sig =
+                "0x6d72c11880cbf55bb8d1e3118c2595352bdb6635239766b39d8cbac42c6a2c9657579203f7fab80bf4e0599364d0d9dbc6c60b9d3ccb61df27df179ea6dbfb501c";
+            await expectRevert(
+                this.instance.SetupTimedata(
+                    registerstart,
+                    registerfinis,
+                    votingstart,
+                    votingfinis,
+                    0,
+                    sig
+                ),
+                "Non Admin Address"
+            );
         });
-        it("Register Petugas Baru", async () => {
-            let message = web3.utils.soliditySha3(
-                {
-                    t:'address',
-                    v:petugas_address
-                },
-                {
-                    t:'uint256',
-                    v:ketua_nonce
-                }
+        it("Admin Menambahkan Data Waktu", async function () {
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            const sig =
+                "0xfd0ee92d385d6b6c38a52f28a5da275fb742e684788284128c1f164debba43232f18c465c4cda95a22214036f5f9b096d272d6667d946ba2769301a5fc3be3f01b";
+            const receipt = await this.instance.SetupTimedata(
+                registerstart,
+                registerfinis,
+                votingstart,
+                votingfinis,
+                0,
+                sig
             );
-            sign_message = await web3.eth.accounts.sign(message,ketua);
-            receipt = await instance.addPetugas(petugas_address,ketua_nonce, sign_message.signature);
-            expectEvent(receipt,'RegisterPetugas',{
-                _petugasAddress:petugas_address,
-                sender:ketua_address
-            });
-            assert(await instance.Petugas(petugas_address) === true);
-        });
-        it("Remove Petugas", async () => {
-            let message = web3.utils.soliditySha3(
-                {
-                    t:'address',
-                    v:petugas_address
-                },
-                {
-                    t:'uint256',
-                    v:ketua_nonce
-                }
-            );
-            sign_message = await web3.eth.accounts.sign(message,ketua);
-            receipt = await instance.removePetugas(petugas_address, ketua_nonce, sign_message.signature);
-            expectEvent(receipt,"RemovePetugas",{
-                _petugasAddress:petugas_address,
-                sender:ketua_address
-            });
-            assert(await instance.Petugas(petugas_address) === false);
-        });
-        it("Setup Voting & Register Timestamp", async () => {
-            let message = web3.utils.soliditySha3(
-                {
-                    t:'uint256',
-                    v:startregister
-                },
-                {
-                    t:'uint256',
-                    v:finisregister
-                },
-                {
-                    t:'uint256',
-                    v:startvoting
-                },
-                {
-                    t:'uint256',
-                    v:finisvoting
-                }
-            );
-            sign_message = await web3.eth.accounts.sign(message,ketua);
-            receipt = await instance.setVotingTimestampEvent(
-                startregister,
-                finisregister,
-                startvoting,
-                finisvoting,
-                sign_message.signature
-            );
-            expectEvent(receipt,'VotingTimeSet',{
-                startRegister:new BN(startregister),
-                finisRegister:new BN(finisregister),
-                startVoting:new BN(startvoting),
-                finisVoting:new BN(finisvoting)
+            expectEvent(receipt, "VotingTime", {
+                _registerstart: new BN(registerstart),
+                _registerfinis: new BN(registerfinis),
+                _votingstart: new BN(votingstart),
+                _votingfinis: new BN(votingfinis),
+                _ownerAddress: "0x012F1Dfb957C87D4B940249652ddd20bC63bE83C",
             });
         });
     });
-    describe("Petugas", function(){
-        let add_petugas_signature = process.env.register_petugas_signature;
-        let set_timestamp_signature = process.env.voting_time_signature;
-
-        let ketua_address = web3.eth.accounts.privateKeyToAccount(ketua).address;
-        let petugas_address = web3.eth.accounts.privateKeyToAccount(petugas).address;
-        let pemilih = web3.eth.accounts.privateKeyToAccount(pemilih4).address;
-        before(async function(){
-            let ketua_nonce = await web3.eth.getTransactionCount(ketua_address);
-            petugas_nonce = await web3.eth.getTransactionCount(petugas_address);
-            let instance = await vote.deployed();
-            await instance.addPetugas(petugas_address,ketua_nonce,add_petugas_signature);
-            await instance.setVotingTimestampEvent(startregister,finisregister,startvoting,finisvoting,set_timestamp_signature);
-        });
-        it("Register Kandidat", async () => {
-            let kandidat_bytes_name = web3.utils.soliditySha3({t:'string',v:'Abiyyu Yafi'});
-            let message = web3.utils.soliditySha3(
-                {
-                    t:'uint256',
-                    v:new BN(1)
-                },
-                {
-                    t:'bytes32',
-                    v:kandidat_bytes_name
-                },
-                {
-                    t:'uint256',
-                    v:petugas_nonce
-                }
+    describe("Pendaftaran Kandidat", function () {
+        it("Melakukan Pendaftaran Kandidat Sebelum Waktu Dimulai", async function () {
+            const sig_time =
+                "0xfd0ee92d385d6b6c38a52f28a5da275fb742e684788284128c1f164debba43232f18c465c4cda95a22214036f5f9b096d272d6667d946ba2769301a5fc3be3f01b";
+            const sig_register =
+                "0x1d74761b6a209a993506e8e12aa27597bc671cdc1753d4da84363f13284b76d9449b996f7d6b460d46c416c07471cf105c69ce766c738ca1a58a366305ec84811c";
+            const bytes_name =
+                "0x660661ef173d593dd34075616e42618861ee284490dc1a9466cc1a883160e3dd";
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            await this.instance.SetupTimedata(
+                registerstart,
+                registerfinis,
+                votingstart,
+                votingfinis,
+                0,
+                sig_time
             );
-            let sign_message = await web3.eth.accounts.sign(message,petugas);
-            let receipt = await instance.registerKandidat(
+            await expectRevert(
+                this.instance.KandidatRegister(
+                    1,
+                    0,
+                    1627545600,
+                    bytes_name,
+                    sig_register
+                ),
+                "Waktu pendaftaran belum dibuka"
+            );
+        });
+        it("Non Admin Mendaftarkan Kandidat", async function(){
+            const sig_time =
+                "0x526e9c73acbad04e23461882bb849e3e99ceec1e95214b191fb1e677818a7f4e1430b66772d3a6344e107dc8342cd8cf1e9e6f8e8b5416eb98e14e13bf2e9d991c";
+            const sig_register =
+                "0x2ee94d2883823ebee357645c58c6478830d7c6f05e58c597ae8c27aae9aee34855b91942d7778261eddf7e0bfaf942e400e07e102fef98072f54e64a13779bdc1c";
+            const bytes_name =
+                "0x660661ef173d593dd34075616e42618861ee284490dc1a9466cc1a883160e3dd";
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            await this.instance.SetupTimedata(
+                1627534800,
+                registerfinis,
+                votingstart,
+                votingfinis,
+                0,
+                sig_time
+            );
+            await expectRevert(
+                this.instance.KandidatRegister(
+                    1,
+                    0,
+                    1627545600,
+                    bytes_name,
+                    sig_register
+                ),
+                "Non Admin Address"
+            );
+        });
+        it("Admin Mendaftarkan Kandidat Setelah Waktu Dimulai", async function(){
+            const sig_time = "0x526e9c73acbad04e23461882bb849e3e99ceec1e95214b191fb1e677818a7f4e1430b66772d3a6344e107dc8342cd8cf1e9e6f8e8b5416eb98e14e13bf2e9d991c"
+            const sig_register = "0x1d74761b6a209a993506e8e12aa27597bc671cdc1753d4da84363f13284b76d9449b996f7d6b460d46c416c07471cf105c69ce766c738ca1a58a366305ec84811c"
+            const bytes_name = "0x660661ef173d593dd34075616e42618861ee284490dc1a9466cc1a883160e3dd"
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C")
+            await this.instance.SetupTimedata(
+                1627534800,
+                registerfinis,
+                votingstart,
+                votingfinis,
+                0,
+                sig_time
+            );
+            const receipt = await this.instance.KandidatRegister(
                 1,
-                petugas_nonce,
-                livetimeregister,
-                kandidat_bytes_name,
-                sign_message.signature
+                0,
+                1627545600,
+                bytes_name,
+                sig_register
             );
-            expectEvent(receipt,'RegisterKandidat',{
+            expectEvent(receipt,"RegisterKandidat",{
                 _kandidatID:new BN(1),
                 _totalVote:new BN(0),
-                _kandidatName:kandidat_bytes_name,
-                sender:petugas_address
-            });
-            let result = await instance.getKandidatData(0);
-            assert(result[0].toString() === '1');
-            assert(result[1].toString() === '0');
-            assert(result[2] === kandidat_bytes_name);
-        });
-        it("Register Pemilih", async () => {
-            let message = web3.utils.soliditySha3(
-                {
-                    t:'address',
-                    v:pemilih
-                },
-                {
-                    t:'uint256',
-                    v:petugas_nonce
-                }
-            );
-            let sign_message = await web3.eth.accounts.sign(message,petugas);
-            let receipt = await instance.registerPemilih(
-                pemilih,
-                petugas_nonce,
-                livetimeregister,
-                sign_message.signature
-            );
-            expectEvent(
-                receipt,'RegisterPemilih',
-                {
-                    _pemilihAddress:pemilih,
-                    _statusHakpilih:new BN(1),
-                    statusVoting:false
-                }
-            );
-            let result = await instance.pemilih(pemilih);
-            assert(result[0].toString() === '1');
-            assert(result[1].toString() === '0');
-            assert(result[2] === false)
-        });
-    })
-    describe("Pemilihan", function(){
-        let instance;
-        let ketua_nonce;
-        let petugas_address
-        let pemilih1_address;
-        let pemilih2_address;
-        let pemilih3_address;
-        let add_petugas_signature;
-        let set_timestamp_signature;
-        before(async function(){
-            instance = await vote.deployed();
-            ketua_nonce = await web3.eth.getTransactionCount(web3.eth.accounts.privateKeyToAccount(ketua).address);
-            petugas_address = web3.eth.accounts.privateKeyToAccount(petugas).address;
-            pemilih1_address = web3.eth.accounts.privateKeyToAccount(pemilih1).address;
-            pemilih2_address = web3.eth.accounts.privateKeyToAccount(pemilih2).address;
-            pemilih3_address = web3.eth.accounts.privateKeyToAccount(pemilih3).address;
-            // register petugas & seting voting and register time
-            add_petugas_signature = process.env.register_petugas_signature;
-            set_timestamp_signature = process.env.voting_time_signature;
-            await instance.addPetugas(petugas_address,ketua_nonce,add_petugas_signature);
-            await instance.setVotingTimestampEvent(startregister,finisregister,startvoting,finisvoting,set_timestamp_signature);
-        });
-        it("Pemilihan", async () => {
-            // Register Kandidat 1
-            let petugas1_nonce = await web3.eth.getTransactionCount(petugas_address);
-            let kandidat1_bytes_name = web3.utils.soliditySha3({t:'string',v:"Abiyyu Yafi"});
-            let kandidat1_message = web3.utils.soliditySha3(
-                {
-                    t:'uint256',
-                    v:new BN(1)
-                },
-                {
-                    t:'bytes32',
-                    v:kandidat1_bytes_name
-                },
-                {
-                    t:'uint256',
-                    v:petugas1_nonce
-                }
-            );
-            let kandidat1_sign_message = await web3.eth.accounts.sign(kandidat1_message, petugas);
-            await instance.registerKandidat(
-                1,
-                petugas1_nonce,
-                livetimeregister,
-                kandidat1_bytes_name,
-                kandidat1_sign_message.signature
-            );
+                _kandidatName:bytes_name,
+                _ownerAddress:"0x012F1Dfb957C87D4B940249652ddd20bC63bE83C",
+            })
+        })
+    });
 
-            // Register Kandidat 2
-            let petugas2_nonce = await web3.eth.getTransactionCount(petugas_address);
-            let kandidat2_bytes_name = web3.utils.soliditySha3({t:'string',v:"Abiyyu Yafi"});
-            let kandidat2_message = web3.utils.soliditySha3(
-                {
-                    t:'uint256',
-                    v:new BN(2)
-                },
-                {
-                    t:'bytes32',
-                    v:kandidat2_bytes_name
-                },
-                {
-                    t:'uint256',
-                    v:petugas2_nonce
-                }
+    describe("Pendaftaran Pemilih", function(){
+        it("Melakukan Pendaftaran Pemilih Sebelum Waktu Dimulai", async function(){
+            const sig_time = "0xfd0ee92d385d6b6c38a52f28a5da275fb742e684788284128c1f164debba43232f18c465c4cda95a22214036f5f9b096d272d6667d946ba2769301a5fc3be3f01b"
+            const sig_register = "0x6abb89de11b8d3487af15efda74941359f1f80c6668a626c4d5c71b3f40f9bd31fcbf220321c68d5b427ef6b1308792daf62d43f15e188a7f7021f0a2a56495d1b"
+            const livetime = "1627545600"
+            const pemilih_address = "0xFabf8979D3A16170ce8a13C1281268fb37e8f55b"
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C")
+            await this.instance.SetupTimedata(
+                registerstart,
+                registerfinis,
+                votingstart,
+                votingfinis,
+                0,
+                sig_time
             );
-            let kandidat2_sign_message = await web3.eth.accounts.sign(kandidat2_message, petugas);
-            await instance.registerKandidat(
-                2,
-                petugas2_nonce,
-                livetimeregister,
-                kandidat2_bytes_name,
-                kandidat2_sign_message.signature
+            await expectRevert(
+                this.instance.PemilihRegister(
+                    pemilih_address,
+                    0,
+                    livetime,
+                    sig_register
+                ),
+                "Waktu pendaftaran belum dibuka"
             );
-
-            // regiser Pemilih 1
-            let petugas3_nonce = await web3.eth.getTransactionCount(petugas_address);
-            let pemilih1_message = web3.utils.soliditySha3(
-                {
-                    t:'address',
-                    v:pemilih1_address
-                },
-                {
-                    t:'uint256',
-                    v:petugas3_nonce
-                }
+        });
+        it("Non Admin Mendaftarkan Pemilih", async function(){
+            const sig_time = "0x526e9c73acbad04e23461882bb849e3e99ceec1e95214b191fb1e677818a7f4e1430b66772d3a6344e107dc8342cd8cf1e9e6f8e8b5416eb98e14e13bf2e9d991c"
+            const sig_register = "0x85ef23f96ea0630d9abafc1ba61c01c249ad34aca138210bccc3af5799801e9f5c3e984fed350244acdeafecd3f7aa6a5ecbd560f461b05797d842ddac185ea51b"
+            const pemilih_address = "0xFabf8979D3A16170ce8a13C1281268fb37e8f55b"
+            const livetime = 1627545600
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C")
+            await this.instance.SetupTimedata(
+                1627534800,
+                registerfinis,
+                votingstart,
+                votingfinis,
+                0,
+                sig_time
             );
-            let pemilih1_sign_message = await web3.eth.accounts.sign(pemilih1_message,petugas);
-            await instance.registerPemilih(pemilih1_address,petugas3_nonce,livetimeregister,pemilih1_sign_message.signature);
-            
-            // voting
-            let pemilih_nonce = await web3.eth.getTransactionCount(pemilih1_address);
-            let voting_message = web3.utils.soliditySha3(
-                {
-                    t:'uint256',
-                    v:new BN(1)
-                },
-                {
-                    t:'uint256',
-                    v:pemilih_nonce
-                }
+            await expectRevert(
+                this.instance.PemilihRegister(
+                    pemilih_address,
+                    0,
+                    livetime,
+                    sig_register
+                ),
+                "Non Admin Address"
             );
-            let pemilih_sign_message = await web3.eth.accounts.sign(voting_message,pemilih1);
-            let voting_receipt = await instance.Voting(
-                1,
-                pemilih_nonce,
-                livetimevoting,
-                pemilih_sign_message.signature
+        });
+        it("Melakukan Pendaftaran Pemilih Dengan Address Yang Sama Dua Kali", async function(){
+            const sig_time = "0x526e9c73acbad04e23461882bb849e3e99ceec1e95214b191fb1e677818a7f4e1430b66772d3a6344e107dc8342cd8cf1e9e6f8e8b5416eb98e14e13bf2e9d991c"
+            const sig_register = "0x6abb89de11b8d3487af15efda74941359f1f80c6668a626c4d5c71b3f40f9bd31fcbf220321c68d5b427ef6b1308792daf62d43f15e188a7f7021f0a2a56495d1b"
+            const pemilih_address = "0xFabf8979D3A16170ce8a13C1281268fb37e8f55b"
+            const livetime = 1627545600
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C")
+            await this.instance.SetupTimedata(
+                1627534800,
+                registerfinis,
+                votingstart,
+                votingfinis,
+                0,
+                sig_time
             );
-            expectEvent(voting_receipt,'Voted',{
-                voter:pemilih1_address,
-                kandidatID:new BN(1),
-                statusVoting:true
+            await this.instance.PemilihRegister(pemilih_address, 0, livetime, sig_register)
+            await expectRevert(
+                this.instance.PemilihRegister(
+                    pemilih_address,
+                    0,
+                    livetime,
+                    sig_register
+                ),
+                "Pemilih telah memiliki hak pilih"
+            );
+        });
+        it("Admin Mendaftarkan Pemilih", async function(){
+            const sig_time = "0x526e9c73acbad04e23461882bb849e3e99ceec1e95214b191fb1e677818a7f4e1430b66772d3a6344e107dc8342cd8cf1e9e6f8e8b5416eb98e14e13bf2e9d991c"
+            const sig_register = "0x6abb89de11b8d3487af15efda74941359f1f80c6668a626c4d5c71b3f40f9bd31fcbf220321c68d5b427ef6b1308792daf62d43f15e188a7f7021f0a2a56495d1b"
+            const pemilih_address = "0xFabf8979D3A16170ce8a13C1281268fb37e8f55b"
+            const livetime = 1627545600
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C")
+            await this.instance.SetupTimedata(
+                1627534800,
+                registerfinis,
+                votingstart,
+                votingfinis,
+                0,
+                sig_time
+            );
+            const receipt =  await this.instance.PemilihRegister(pemilih_address, 0, livetime, sig_register)
+            expectEvent(receipt, "RegisterPemilih",{
+                _pemilihAddress:pemilih_address,
+                _statusHakPilih:new BN(1),
+                statusVoting:false,
+                _ownerAddress:"0x012F1Dfb957C87D4B940249652ddd20bC63bE83C",
             });
-            let result = await instance.pemilih(pemilih1_address);
-            assert(result[0].toString() === '1');
-            assert(result[1].toString() === '1');
-            assert(result[2] === true)
         });
     });
+    describe("Pemilihan", function(){
+        it("Melakukan Pemilihan Disaat Waktu Pendaftaran Belum Berakhir", async function(){
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            const livetime = 1627545600
+
+            // Pengaturan waktu 
+            const sig_time = "0x5dd1373ada66cf5bb2dd7d10dea7db69e8695a6d3d6936fa2d6600357a75dfbd65a4345cbfcc7280489786b87fb4b9720d9328965c3fb2dbe9ee02616eabbaa91c"
+            await this.instance.SetupTimedata(1627542000,1627549200,votingstart,votingfinis,0,sig_time);
+
+            // Pendaftaran Kandidat
+            const sig_kandidat = "0x1d74761b6a209a993506e8e12aa27597bc671cdc1753d4da84363f13284b76d9449b996f7d6b460d46c416c07471cf105c69ce766c738ca1a58a366305ec84811c"
+            const bytes_name = "0x660661ef173d593dd34075616e42618861ee284490dc1a9466cc1a883160e3dd"
+            await this.instance.KandidatRegister(
+                1,
+                0,
+                livetime,
+                bytes_name,
+                sig_kandidat
+            );
+
+            // Pendaftaran Pemilih
+            const sig_pemilih = "0x6abb89de11b8d3487af15efda74941359f1f80c6668a626c4d5c71b3f40f9bd31fcbf220321c68d5b427ef6b1308792daf62d43f15e188a7f7021f0a2a56495d1b"
+            const pemilih_address = "0xFabf8979D3A16170ce8a13C1281268fb37e8f55b"
+            this.instance.PemilihRegister(pemilih_address, 0, livetime, sig_pemilih);
+
+            // Pemilihan
+            const sign_pemilihan = "0xeb3ef6180e75d10699984aefb6331fde45fd1a8d91b290e403dc31e93ecfffb623e99923781fcf568a3812c97b775d2deabdc5b1a9217614cd481aca39c1906c1c"
+            await expectRevert(
+                this.instance.Voting(1, 0, livetime,sign_pemilihan),
+                "Waktu pendaftaran telah ditutup"
+            );
+        });
+        it("Melakukan Pemilihan Disaat Waktu Pemilihan Belum dimulai", async function(){
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            const livetime = 1627545600
+
+            // Pengaturan waktu 
+            const sig_time = "0xdea188107d0f8ec13de0bce536842af7119b0718dca0586c9894843957d04ffa5306ccc5a32cfc9eab54886406904b76a926eabdc4a5f67b872723cbc1d0adbb1c"
+            await this.instance.SetupTimedata(1627538400,1627542000,1627549200,1627552800,0,sig_time);
+
+            // Pendaftaran Kandidat
+            const sig_kandidat = "0x1d74761b6a209a993506e8e12aa27597bc671cdc1753d4da84363f13284b76d9449b996f7d6b460d46c416c07471cf105c69ce766c738ca1a58a366305ec84811c"
+            const bytes_name = "0x660661ef173d593dd34075616e42618861ee284490dc1a9466cc1a883160e3dd"
+            await this.instance.KandidatRegister(
+                1,
+                0,
+                1627540200,
+                bytes_name,
+                sig_kandidat
+            );
+
+            // Pendaftaran Pemilih
+            const sig_pemilih = "0x6abb89de11b8d3487af15efda74941359f1f80c6668a626c4d5c71b3f40f9bd31fcbf220321c68d5b427ef6b1308792daf62d43f15e188a7f7021f0a2a56495d1b"
+            const pemilih_address = "0xFabf8979D3A16170ce8a13C1281268fb37e8f55b"
+            this.instance.PemilihRegister(pemilih_address, 0, 1627540200, sig_pemilih);
+
+            //Pemilihan
+            const sign_pemilihan = "0xeb3ef6180e75d10699984aefb6331fde45fd1a8d91b290e403dc31e93ecfffb623e99923781fcf568a3812c97b775d2deabdc5b1a9217614cd481aca39c1906c1c"
+            await expectRevert(
+                this.instance.Voting(1, 0, livetime,sign_pemilihan),
+                "Waktu Voting belum dibuka"
+            );
+        });
+        it("Melakukan Pemilihan Dua Kali", async function(){
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            const livetime = 1627545600
+            // Pengaturan waktu 
+            const sig_time = "0x2c69391b1fc7a97d1cc86ac268c7afecea9c138224edb9bc78b50f0a735389f47ddbbe145df0b142659529d0012fbe20eca786fc0230ab989208859156448f711b"
+            await this.instance.SetupTimedata(1627534800,1627538400,1627542000,1627549200,0,sig_time);
+            // Pendaftaran Kandidat
+            const sig_kandidat = "0x1d74761b6a209a993506e8e12aa27597bc671cdc1753d4da84363f13284b76d9449b996f7d6b460d46c416c07471cf105c69ce766c738ca1a58a366305ec84811c"
+            const bytes_name = "0x660661ef173d593dd34075616e42618861ee284490dc1a9466cc1a883160e3dd"
+            await this.instance.KandidatRegister(
+                1,
+                0,
+                1627536600,
+                bytes_name,
+                sig_kandidat
+            );
+            // Pendaftaran Pemilih
+            const sig_pemilih = "0x6abb89de11b8d3487af15efda74941359f1f80c6668a626c4d5c71b3f40f9bd31fcbf220321c68d5b427ef6b1308792daf62d43f15e188a7f7021f0a2a56495d1b"
+            const pemilih_address = "0xFabf8979D3A16170ce8a13C1281268fb37e8f55b"
+            this.instance.PemilihRegister(pemilih_address, 0, 1627536600, sig_pemilih);
+            //Pemilihan
+            const sign_pemilihan = "0xeb3ef6180e75d10699984aefb6331fde45fd1a8d91b290e403dc31e93ecfffb623e99923781fcf568a3812c97b775d2deabdc5b1a9217614cd481aca39c1906c1c"
+            await this.instance.Voting(1, 0, livetime,sign_pemilihan)
+            await expectRevert(
+                this.instance.Voting(1, 0, livetime,sign_pemilihan),
+                "Pemilih sudah menggunakan hak pilih"
+            )
+        });
+        it("Non Pemilih Melakukan Pemilihan", async function(){
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            const livetime = 1627545600
+            // Pengaturan waktu 
+            const sig_time = "0x2c69391b1fc7a97d1cc86ac268c7afecea9c138224edb9bc78b50f0a735389f47ddbbe145df0b142659529d0012fbe20eca786fc0230ab989208859156448f711b"
+            await this.instance.SetupTimedata(1627534800,1627538400,1627542000,1627549200,0,sig_time);
+            // Pendaftaran Kandidat
+            const sig_kandidat = "0x1d74761b6a209a993506e8e12aa27597bc671cdc1753d4da84363f13284b76d9449b996f7d6b460d46c416c07471cf105c69ce766c738ca1a58a366305ec84811c"
+            const bytes_name = "0x660661ef173d593dd34075616e42618861ee284490dc1a9466cc1a883160e3dd"
+            await this.instance.KandidatRegister(
+                1,
+                0,
+                1627536600,
+                bytes_name,
+                sig_kandidat
+            );
+            //Pemilihan
+            const sign_pemilihan = "0x228e7dabb08c20908c9199168a4338703ca697f355961af7c88e958c12ff2d466c5c97af18d2bd0366c6581f38be22508f5d1c09db6d7c6d061c5db5c97cb30d1c"
+            await expectRevert(
+                this.instance.Voting(1, 0, livetime,sign_pemilihan),
+                "Pemilih tidak memiliki hak pilih"
+            );
+        });
+        it("Pemilih Melakukan Pemilihan", async function(){
+            this.instance = await vote.new("0x012F1Dfb957C87D4B940249652ddd20bC63bE83C");
+            const livetime = 1627545600
+            // Pengaturan waktu 
+            const sig_time = "0x2c69391b1fc7a97d1cc86ac268c7afecea9c138224edb9bc78b50f0a735389f47ddbbe145df0b142659529d0012fbe20eca786fc0230ab989208859156448f711b"
+            await this.instance.SetupTimedata(1627534800,1627538400,1627542000,1627549200,0,sig_time);
+            // Pendaftaran Kandidat
+            const sig_kandidat = "0x1d74761b6a209a993506e8e12aa27597bc671cdc1753d4da84363f13284b76d9449b996f7d6b460d46c416c07471cf105c69ce766c738ca1a58a366305ec84811c"
+            const bytes_name = "0x660661ef173d593dd34075616e42618861ee284490dc1a9466cc1a883160e3dd"
+            await this.instance.KandidatRegister(
+                1,
+                0,
+                1627536600,
+                bytes_name,
+                sig_kandidat
+            );
+            // Pendaftaran Pemilih
+            const sig_pemilih = "0x6abb89de11b8d3487af15efda74941359f1f80c6668a626c4d5c71b3f40f9bd31fcbf220321c68d5b427ef6b1308792daf62d43f15e188a7f7021f0a2a56495d1b"
+            const pemilih_address = "0xFabf8979D3A16170ce8a13C1281268fb37e8f55b"
+            this.instance.PemilihRegister(pemilih_address, 0, 1627536600, sig_pemilih);
+            //Pemilihan
+            const sign_pemilihan = "0xeb3ef6180e75d10699984aefb6331fde45fd1a8d91b290e403dc31e93ecfffb623e99923781fcf568a3812c97b775d2deabdc5b1a9217614cd481aca39c1906c1c"
+            const receipt = await this.instance.Voting(1, 0, livetime,sign_pemilihan)
+            expectEvent(receipt,"Voted",{
+                voterAddress:pemilih_address,
+                kandidatID:new BN(1),
+                statusVoting:true
+            })
+        });
+    })
 });
