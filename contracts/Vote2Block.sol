@@ -25,7 +25,7 @@ contract Vote2Block {
         address _ownerAddress
     );
     event Voted(
-        address indexed voterAddress,
+        address voterAddress,
         uint256 kandidatID,
         bool statusVoting
     );
